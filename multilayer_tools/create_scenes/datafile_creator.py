@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from tools.grids import MultiDimGrid
 from lammps import lammps, PyLammps
 from mpi4py import MPI
 
@@ -9,6 +8,17 @@ PROJECT_PATH = "/home/nagibator69/science/CollisionProject/"
 
 
 def simple_box_creator(sizes, fcc_period, index=0):
+    """
+    Build a simple FCC box, dump XYZ, and return atom positions.
+
+    Args:
+        sizes (tuple of float): Number of unit cells in (X,Y,Z).
+        fcc_period (float): FCC lattice constant.
+        index (int): Scene index to differentiate filenames.
+
+    Returns:
+        ndarray of shape (n_atoms, 4): Columns [type, x, y, z].
+    """
     path = PROJECT_PATH + f"tools/create_scenes/data/test_scene_{index}.txt"
     X, Y, Z = sizes
 
@@ -50,6 +60,12 @@ def simple_box_creator(sizes, fcc_period, index=0):
 
 
 class SimpleData(ABC):
+    """
+    Abstract base for writing LAMMPS data files.
+
+    Subclasses must implement calculate_parameters() and main().
+    """
+
     def __init__(self, file_name="new_file", kwargs=dict()):
         self.data_file = "LAMMPS data file via write_data, version 29 Sep 2021\n\n"
         self.file_name = file_name
@@ -59,9 +75,14 @@ class SimpleData(ABC):
 
     @abstractmethod
     def calculate_parameters(self):
+        """Compute self.atoms, self.velocities, box bounds, masses, etc."""
         pass
 
     def create_file(self):
+        """
+        Assemble header, Masses, Atoms, Velocities sections and write to disk.
+        """
+
         mult = len(set(self.atoms[:, 0])) // self.atom_types
 
         self.data_file += f"{self.atoms_num} atoms\n"
@@ -102,10 +123,17 @@ class SimpleData(ABC):
 
     @abstractmethod
     def main(self):
+        """Top-level: call calculate_parameters() then create_file()."""
         pass
 
 
 class MultilayerData(SimpleData):
+    """
+    Build multilayer structures by stacking scaled FCC boxes.
+
+    Extends SimpleData to compute multiple atom types, positions, and bounds.
+    """
+
     def get_inter_layer_dist(self, a, k=2):
         b = k * a
         h2 = (2 * a * b + b**2 - a**2) / 8

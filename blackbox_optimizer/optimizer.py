@@ -4,8 +4,8 @@ from scipy.optimize import basinhopping
 import math
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing import Process
-from .PolyFit import PolynomWorker
-from .Scaler import FullScaler
+from .poly_fit import PolynomWorker
+from .scaler import FullScaler
 import traceback
 
 
@@ -20,6 +20,31 @@ def basin_scheduler(N, L, dim):
 
 
 class RBF:
+    """
+    Radial Basis Function surrogate optimizer.
+
+    Uses a combination of RBF interpolation, a polynomial trend, and density-based
+    exploration to suggest new points for expensive black-box functions.
+
+    Attributes:
+        reg_coeff (float): Regularization coefficient.
+        dx (float): Finite-difference step for numerical gradients.
+        epsilon (float): Perturbation size around best point.
+        lr (float): Learning rate (not used directly).
+        dropout (float): Probability of exploring around current best.
+        bounds (ndarray): Array of shape (dim, 2) with lower/upper bounds.
+        alphas (ndarray): Exploration weights for each process.
+        num_processes (int): Number of parallel workers.
+        scaler (FullScaler): Scales X and y to [–1,1] or [0,1].
+        polynom (PolynomWorker): Fits a low-degree polynomial trend.
+        main_func (callable): Objective function f(x, proc_ind, func_kwargs).
+        func_kwargs (dict): Extra arguments for main_func.
+        minimizer_kwargs (dict): Passed to SciPy's minimizer.
+        centers (list): Evaluated sample points.
+        y (ndarray): Objective values at sample points (scaled).
+        weights (ndarray): Combined RBF + polynomial weights.
+    """
+
     def __init__(
         self,
         X=None,
@@ -41,6 +66,29 @@ class RBF:
         reg_coeff: float = 0,
         start_steps: int = 1,
     ):
+        """
+        Initialize the RBF optimizer.
+
+        Args:
+            X (ndarray, optional): Initial sample points, shape (n_samples, dim).
+            y (ndarray, optional): Observed values at X, shape (n_samples, 1).
+            lr (float): (Unused) learning rate placeholder.
+            dx (float): Finite-difference step size.
+            epsilon (float): Neighborhood radius for local refinement.
+            rcond (int, optional): rcond parameter for least squares.
+            bounds (ndarray): Array of shape (dim,2) specifying [min,max] per dimension.
+            main_func (callable): Function to evaluate: f(x, proc_ind, func_kwargs) → float.
+            num_processes (int): Number of parallel evaluations per iteration.
+            max_alpha (float): Maximum exploration weight.
+            dropout (float): Chance to re-exploit around current best.
+            func_kwargs (dict): Extra args passed to main_func.
+            minimizer_kwargs (dict): Extra args passed to basinhopping’s local minimizer.
+            discrete (bool): Round proposed points to integers if True.
+            max_polynom_dim (int, optional): Degree of polynomial trend.
+            checker_point (ndarray, optional): Point to validate interpolation.
+            reg_coeff (float): Regularization coefficient for system solve.
+            start_steps (int): Number of random initial evaluations if X, y not provided.
+        """
         self.reg_coeff = reg_coeff
         self.dx = dx
         self.epsilon = epsilon
@@ -84,6 +132,16 @@ class RBF:
             self.fit(X, y)
 
     def _basis_function(self, center, data_point):
+        """
+        Compute the RBF kernel φ(r) = r² log(r) between two points.
+
+        Args:
+            center (ndarray): Center point, shape (dim,).
+            data_point (ndarray): Query point, shape (dim,).
+
+        Returns:
+            float: Kernel value φ(||center−data_point||).
+        """
         R = np.linalg.norm((center - data_point))
         if R == 0:
             return 0

@@ -5,7 +5,14 @@ import numpy as np
 
 def generate_terms_recursive(dimensions, max_degree, current_combination=[]):
     """
-    A recursive helper function to generate polynomial terms.
+    Generate all exponent tuples for monomials up to total degree.
+
+    Args:
+        dimensions (int): Number of input dimensions.
+        max_degree (int): Maximum total degree per term.
+
+    Returns:
+        ndarray of shape (n_terms, dimensions): Each row is a tuple of exponents.
     """
     if len(current_combination) == dimensions:
         yield tuple(current_combination)
@@ -19,18 +26,21 @@ def generate_terms_recursive(dimensions, max_degree, current_combination=[]):
 
 
 def generate_polynomial_terms(dimensions, max_degree):
-    """
-    Generate polynomial terms for a point of N dimensions up to the specified maximum degree (max_degree).
-
-    :param dimensions: Number of dimensions (N).
-    :param max_degree: Maximum polynomial power (max_d).
-    :return: A list of tuples representing polynomial terms.
-    """
     return np.array(list(generate_terms_recursive(dimensions, max_degree)))
 
 
 class PolynomWorker:
     def __init__(self, point_dim: int, max_d: int = 2):
+        """
+        Handles polynomial basis evaluation and gradient computation.
+
+        Attributes:
+            max_d (int): Maximum total degree.
+            point_dim (int): Number of input dimensions.
+            polynom_scheme (ndarray): List of exponent tuples for each term.
+            weights (ndarray): Learned weights per polynomial term.
+            grad_scheme (list): Exponent arrays for gradient of each input dimension.
+        """
         self.max_d = max_d
         self.point_dim = point_dim
 
@@ -46,6 +56,15 @@ class PolynomWorker:
             self.grad_scheme.append(pows)
 
     def get_polynom(self, point: np.array) -> np.array:
+        """
+        Evaluate all monomial terms at a given point.
+
+        Args:
+            point (ndarray): Input vector, shape (point_dim,).
+
+        Returns:
+            list of float: Values of each polynomial term.
+        """
         assert len(point) == self.point_dim, "Wrong point dimension for polynom!"
         res = []
         for j in self.polynom_scheme:
@@ -53,6 +72,15 @@ class PolynomWorker:
         return res
 
     def grad_polynom(self, point: np.array) -> np.array:
+        """
+        Compute gradient of the polynomial trend at a given point.
+
+        Args:
+            point (ndarray): Input vector, shape (point_dim,).
+
+        Returns:
+            ndarray: Gradient vector, shape (point_dim,).
+        """
         assert len(point) == self.point_dim, "Wrong point dimension for polynom grad!"
         res = np.zeros(len(point))
         for k in range(len(point)):

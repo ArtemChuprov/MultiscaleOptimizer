@@ -4,12 +4,33 @@ from lammps import lammps, PyLammps
 
 
 def get_inter_layer_dist(a, k=2):
+    """
+    Compute vertical separation between successive FCC layers.
+
+    Args:
+        a (float): FCC lattice parameter.
+        k (int): Relative scaling factor for layer spacing.
+
+    Returns:
+        float: Inter-layer distance h = sqrt[(2a·(k a) + (k a)^2 − a^2) / 8].
+    """
     b = k * a
     h2 = (2 * a * b + b**2 - a**2) / 8
     return h2**0.5
 
 
 def upper_layer_coord(atom_type, h, fcc_period):
+    """
+    Compute the z-coordinate of the upper boundary for a given atom layer.
+
+    Args:
+        atom_type (int): 1-based layer index.
+        h (float): Base height increment.
+        fcc_period (float): Lattice constant of the FCC lattice.
+
+    Returns:
+        float: Sum of vertical shifts for stacking and inter-layer spacing.
+    """
     z = [fcc_period * (h - 0.5) * 2**i for i in range(atom_type)]
     cross_z = [get_inter_layer_dist(fcc_period) * 2**i for i in range(atom_type - 1)]
 
@@ -17,12 +38,22 @@ def upper_layer_coord(atom_type, h, fcc_period):
 
 
 def create_multilayer(index=0, **particle_kwargs):
-    if "file_name" not in particle_kwargs:
-        file_name: str = (
-            f"/trinity/home/artem.chuprov/projects/Multiscale_BlackBox/data/Cu/Multilayer_Step_{index}"
-        )
-    else:
-        file_name = particle_kwargs["file_name"]
+    """
+    Generate a multilayer atomic system, write LAMMPS data, and initialize PyLammps.
+
+    Args:
+        index (int): Scene index (unused here).
+        **particle_kwargs: Must include:
+            - file_name (str): Output data filename.
+            - types_number (int): Number of distinct atomic layers/types.
+            - width (tuple of 3 ints): Number of unit cells in x,y,z for base layer.
+            - fcc_period (float): FCC lattice constant.
+            - masses (list of floats): Atomic masses per layer.
+    Returns:
+        PyLammps: LAMMPS interface object with region and groups defined.
+    """
+    assert "file_name" in particle_kwargs, "file_name param has to be specified!"
+    file_name = particle_kwargs["file_name"]
     mlt = MultilayerData(
         file_name=file_name,
         kwargs=particle_kwargs,
