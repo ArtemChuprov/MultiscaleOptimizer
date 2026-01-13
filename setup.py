@@ -7,4 +7,9 @@ setup(
     author="Artem",
     author_email="artyomchuprow@yandex.ru",
     packages=["blackbox_optimizer", "multilayer_tools"],
+    install_requires=[
+        "numpy>=2.0",
+        "mpi4py>=4.0",
+    ],
 )
+
